@@ -1,0 +1,173 @@
+---
+title: "ndv24_HW_04"
+author: "Nicholas Velotta | ndv24@uw.edu"
+date: '`r format(Sys.time(), "%Y-%m-%d %H:%M")`'
+header-includes: #allows you to add in your own Latex packages
+- \usepackage{float} #use the 'float' package
+- \floatplacement{figure}{H} #make every figure with caption = h
+output: 
+    bookdown::html_document2:
+        number_sections: true
+        self_contained: true
+        code_folding: hide
+        toc: true
+        toc_float:
+            collapsed: true
+            smooth_scroll: false
+    pdf_document:
+        number_sections: true
+        toc: true
+        fig_cap: yes
+        keep_tex: yes
+urlcolor: blue
+---
+
+```{r echo = FALSE, results = 'hide', message = FALSE, warning = FALSE, include = FALSE}
+knitr::opts_chunk$set
+library(tidyverse)
+library(pander)
+library(table1)
+library(stargazer)
+library(ggplot2)
+library(knitr)
+library(kableExtra)
+library(magrittr)
+library(psych)
+library(readstata13)
+library(animation)
+library(captioner)
+library(dplyr)
+library(Rmisc)
+```
+
+
+# Questions about graph
+
+```{r, echo=FALSE}
+#creating data
+gradpain <- c(rep(0,11), rep(1,1), rep(2,2), rep(3,6), rep(4,8), rep(5,10),
+ rep(6,8), rep(7,30), rep(8,10), rep(9,6), rep(10,2))
+
+#plotting
+barplot(table(gradpain), las=1, ylab="Frequency", xlab="Pain Scale",
+ main="How painful is graduate school?")
+
+```
+
+> How many graduate students are in the sample? Use R code to determine this.
+
+```{r}
+length(gradpain)
+```
+The sample size is `r length(gradpain)`
+
+> What is the sample mean?
+
+```{r}
+mean(gradpain)
+```
+The mean of `gradpain` is `r round(mean(gradpain), 2)`
+
+# Box 1 Questions
+>Create a function, with these arguments:
+1. the vector of data: "d.vec"
+2. the size of the sample: "n"
+The function will sample with replacement a sample of size "n" from the vector "d.vec". The
+function will return a list that contains
+1. the size of the sample
+2. the mean of the sample
+
+I was a bit confused as to what you're looking for here so I went with 2 interpretations:
+
+This code (`newfunc`) produces a vector as part of the *body*
+
+```{r}
+newfunc <- function(x) {
+    d.vec <- 1:10
+    n <- sample(x = d.vec, size = 100, replace = TRUE)
+    return(c( "average" = mean(n), "sample size" = length(n)))}
+
+newfunc(1)
+```
+
+This code (`newfunc2`) asks for a vector as an argument and a sample size as part of the *arguments*
+```{r}
+newfunc2 <- function(d.vec, n) {
+  s <- sample(x = d.vec, size = n, replace = TRUE)
+  return(c( "average" = mean(s), "sample size" = length(s)))}
+newfunc2(1:10, 150)
+```
+
+# Box 2 Questions 
+
+>Use set.seed(7) then run your function passing in the "gradpain" vector calculated above and a
+sample size of length(gradpain). Use a loop to do this 100 times and store all 100 returned
+means.
+
+```{r}
+# initialize a vector
+F <- NULL
+
+# run the bootstrap
+for (i in seq(from = 1, to = 100, by = 1)){
+    # sample once
+    s <- sample(x = gradpain, size = 100, replace = TRUE)
+    # concatenate the result with the running result
+    F <- c(F, mean(gradpain))
+}
+# mean and standard deviation of the bootstrap
+mean(F)
+
+```
+> What is the mean of these 100 means?
+
+The mean is `r mean(F)`. 
+
+> What is the standard deviation of these 100 means?
+
+The sd is `r sd(F)`.
+
+# Box 3 Questions
+
+> Write another function that performs the steps listed in Box 2. That should be a function with
+these arguments:
+1. the vector of data: "d.vec"
+2. the size of the sample: "n"
+3. the number of samples: "num.samples"
+The function should sample with replacement a sample of size "n" from the vector "d.vec" and
+does this "num.samples" times.
+The function should return a list that contains
+1. the size of each sample
+2. the number of samples
+3. a vector of length num.samples with the mean of each sample
+4. the mean of the means
+5. the standard deviation of the means
+6. the 95% confidence interval around the mean
+Run your function with the three arguments
+d.vec = gradpain, n = length(gradpain), num.samples = 100
+
+```{r}
+T <- NULL
+
+newfunc3 <- function(d.vec, n, num.samples) {
+  for (i in seq(from = 1, to = num.samples, by = 1))
+  s <- sample(x = d.vec, size = n, replace = TRUE)
+  ci_95 <- Rmisc::CI(x = d.vec, ci = 0.95)
+  return(c( "mean of means" = mean(s), "sd of means" = sd(s), "sample size" = length(s), "number of samples" = num.samples, "CI" = ci_95)) 
+  T <- c(T, mean(d.vec), num.samples)} #my vector wont generate for this one...any ideas?
+answers <-newfunc3(gradpain, length(gradpain), 100)
+
+pander(answers)
+```
+
+> What does your function return for the mean of means?
+
+5.681
+
+> What does your function return for the standard deviation of means?
+
+2.587  
+
+> What does your function return for the 95% confidence interval around the mean?
+
+upper limit of 6.054 and lower limit of 4.946
