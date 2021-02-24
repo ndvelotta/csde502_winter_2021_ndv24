@@ -1,0 +1,27 @@
+---
+title: "ndv24_HW_07"
+author: "Nicholas Velotta | ndv24@uw.edu"
+date: '`r format(Sys.time(), "%Y-%m-%d %H:%M")`'
+header-includes: #allows you to add in your own Latex packages
+- \usepackage{float} #use the 'float' package
+- \floatplacement{figure}{H} #make every figure with caption = h
+output: 
+    bookdown::html_document2:
+        number_sections: true
+        self_contained: true
+        code_folding: hide
+        toc: true
+        toc_float:
+            collapsed: true
+            smooth_scroll: false
+    pdf_document:
+        number_sections: true
+        toc: true
+        fig_cap: yes
+        keep_tex: yes
+bibliography: citation2_for_hw_wolt.bib
+csl: apa_single_spaced.csl
+link-citations: true
+urlcolor: blue
+---
+
