@@ -19,9 +19,197 @@ output:
         toc: true
         fig_cap: yes
         keep_tex: yes
-bibliography: citation2_for_hw_wolt.bib
-csl: apa_single_spaced.csl
-link-citations: true
 urlcolor: blue
 ---
+
+```{r setup, include=FALSE, message=FALSE, warning=FALSE, echo=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(knitr)
+library(kableExtra)
+library(haven)
+library(table1)
+AHwave1_v1_haven <- haven::read_dta("H:/csde502_winter_2021_ndv24/AdHealthFullData.dta")
+
+tmpdir <- Sys.getenv("TEMP")
+
+saveRDS(object = AHwave1_v1_haven, file = file.path(tmpdir, "AHwave1_v1_haven.RDS"))
+```
+
+
+# Introduction
+
+
+
+
+```{r}
+#labeling function
+labelled <- function(x, label) {
+    Hmisc::label(x) <- label
+    x
+}
+
+#creating dataset
+dat <- AHwave1_v1_haven %>% 
+    select(H1JO1, BIO_SEX, H1JO5, H1JO6A, H1JO6B, H1JO6C, H1JO6D, H1JO6E)
+
+#creating drinking variable
+dat2 <- dat %>% 
+    mutate(drink = case_when(
+        H1JO1 == 1  ~ 1,
+        H1JO1 == 0  ~ 2,
+        # missing
+        H1JO1%in% c(6, 7, 8) ~ 9)
+    ) %>% 
+    # create factor labels
+    mutate(drink = factor(drink, labels = c(
+        "consumed alcohol", 
+        "no alcohol", 
+        "unknown/missing"
+)))
+
+
+dat3 <- dat2 %>% 
+    mutate(drugs = case_when(
+        H1JO5 == 1 & H1JO6A == 1 ~ "marijunana", #MARIJUANA
+        H1JO5 == 1 & H1JO6B == 1 ~ "crack", #CRACK COCAINE
+        H1JO5 == 1 & H1JO6C == 1 ~ "other cocaine", #other cocaine
+        H1JO5 == 1 & H1JO6D == 1 ~ "inhalants", #INHALANTS
+        H1JO5 == 1 & H1JO6E == 1 ~ "other", #OTHER DRUGS
+        H1JO5 == 0 ~ "none"))  %>% #none
+na.omit()
+
+
+#renaming labels
+dat4_renamed <- dat3 %>% select(BIO_SEX, drink, drugs)
+colnames(dat4_renamed)<-c("biological_sex", "drinking_at_first_intercourse", "drugs_at_first_intercourse")
+
+dat4_renamed <- dat4_renamed %>% 
+    mutate(biological_sex = factor(biological_sex, levels = c(1,2,6), labels = c(
+        "(1) Male",
+        "(2) Female",
+        "(3) Refused or other sex"
+    )))
+
+```
+
+
+```{r}
+#re-labeling the dataset
+attributes(dat4_renamed)$label <- "Sub-set of National Longitudinal Study of Adolescent to Adult Health on drug use during first intercourse"
+
+
+attributes(dat4_renamed$biological_sex)$label <- "Biological sex reported in Wave 1"
+
+attributes(dat4_renamed$biological_sex)$levels <- c("(1) Male", "(2) Female", "(6) Refused or Other")
+
+
+attributes(dat4_renamed$drinking_at_first_intercourse)$label <- "Was the respondent drinking alcohol at the time of first intercourse?"
+
+attributes(dat4_renamed$drugs_at_first_intercourse)$label <- "What drugs did the respondent take at the time of first intercourse (not including alcohol)?"
+```
+
+```{r}
+#count of sex dist in sample
+dat4_renamed %>% 
+    group_by(biological_sex) %>% 
+    summarise(n = n()) %>% 
+    mutate(`%` = n / sum(n) * 100) %>% 
+    mutate(`%` = `%` %>% round(3)) %>% 
+    kable(caption = "Self-reported Sex of Sample Respondents") %>% 
+    kable_classic(full_width = F, html_font = "Cambria") %>% 
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), position = "float_right")
+```
+
+
+
+
+```{r}
+#count of alcohol at 1st intercourse in sample
+
+dat4_renamed %>% 
+    group_by(drinking_at_first_intercourse) %>% 
+    summarise(n = n()) %>% 
+    mutate(`%` = n / sum(n) * 100) %>% 
+    mutate(`%` = `%` %>% round(3)) %>% 
+    kable(caption = "Drinking alcohol at the time of first intercourse") %>% 
+    kable_classic(full_width = F, html_font = "Cambria") %>% 
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), position = "float_right")
+```
+```{r}
+#count of alcohol at 1st intercourse in sample
+
+dat4_renamed %>% 
+    group_by(drugs_at_first_intercourse) %>% 
+    summarise(n = n()) %>% 
+    mutate(`%` = n / sum(n) * 100) %>% 
+    mutate(`%` = `%` %>% round(3)) %>% 
+    kable(caption = "Drug use at the time of first intercourse") %>% 
+    kable_classic(full_width = F, html_font = "Cambria") %>% 
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), position = "float_right")
+```
+
+
+```{r}
+#drug use by sex and whether ps used alcohol
+label(dat4_renamed$biological_sex)       <- "Sex"
+label(dat4_renamed$drinking_at_first_intercourse)       <- "Alcohol use"
+
+table1( ~ biological_sex + drinking_at_first_intercourse | drugs_at_first_intercourse , data=dat4_renamed, overall="Total")
+
+```
+
+
+```{r}
+drug_use_sex <- dat4_renamed %>% 
+    group_by(biological_sex,
+             drugs_at_first_intercourse) %>% 
+    summarise(n = n(), .groups = "drop_last") %>% 
+    mutate(`%` = n / sum(n) * 100)
+
+
+ggplot(data = drug_use_sex, mapping = aes(x = drugs_at_first_intercourse, y = `%`)) +
+    geom_bar(stat = "identity") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+    xlab("Drug used at first intercourse") + ylab("% who used substance") +
+  ggtitle("Drug use at first intercourse by sex") +
+  theme_bw() +
+    facet_grid(~biological_sex)
+```
+
+
+
+```{r}
+alcohol_use_sex <- dat4_renamed %>% 
+    group_by(biological_sex,
+             drinking_at_first_intercourse) %>% 
+    summarise(n = n(), .groups = "drop_last") %>% 
+    mutate(`%` = n / sum(n) * 100)
+
+ggplot(data = alcohol_use_sex, mapping = aes(x = drinking_at_first_intercourse, y = `%`)) +
+    geom_bar(stat = "identity") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+    xlab("Alcohol consumption at first intercourse") + ylab("% who consumed alcohol") +
+  ggtitle("Alcohol consumption at first intercourse by sex") +
+  theme_bw() +
+    facet_grid(~biological_sex)
+```
+
+```{r}
+drink_drug <-  dat4_renamed %>% 
+    group_by(drinking_at_first_intercourse, drugs_at_first_intercourse) %>% 
+    summarise(n = n(), .groups = "drop_last") %>% 
+    mutate(`%` = n / sum(n) * 100)
+
+ggplot(data = drink_drug, mapping = aes(x = drugs_at_first_intercourse, y = `%`, color = drinking_at_first_intercourse, fill=drinking_at_first_intercourse)) +
+    geom_bar(stat = "identity") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  theme(legend.title = element_blank())+
+    xlab("Drug use at first intercourse") + ylab("% who used substance") +
+  ggtitle("Drug use at first intercourse group on alcohol use") + 
+  facet_wrap(~drinking_at_first_intercourse)
+```
+
+
 
