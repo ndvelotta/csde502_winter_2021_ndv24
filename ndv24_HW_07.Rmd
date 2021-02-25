@@ -40,10 +40,19 @@ saveRDS(object = AHwave1_v1_haven, file = file.path(tmpdir, "AHwave1_v1_haven.RD
 
 # Introduction
 
+Research on teen sexual activity often labels any sexual encounters that occur before the age of 18 years as "risk taking" behavior. And, while sex certainly has risks associated with it (namely, sexually transmitted diseases and unplanned pregnancies), those risks endure well past the first 18 years of life for a majority of Americans. Even still, the United States remains behind many other Western, educated, industrialized, rich and democratic (WEIRD) countries in mandating comprehensive sexual education for all students and the U.S. is a meek provider when it comes to sexual health care. Given that other WEIRD countries offer services for sexual health early-on in the life cycle and our country's puritan routes (and enduring promotion of conservative, Christian ideology, for that matter), social scientists generally see the U.S.'s repressed approach to sexual development and health as a cultural phenomenon rather than a science-driven agenda.
 
+One area of sexual health that may be "appropriately" labeled as risk-taking behavior are  sexual encounters that involve drug use. There is a growing literature showing that the rise of "hook-up culture" on college campuses coincides with a rise in a rise in social events focused on drinking and, many times, *binge-drinking*. In the last decade, the media has focused on such social events as hot-spots for sexual misconduct and assault. And previous research illustrates alcohol is associated with more risk-taking behavior and  less precautions during sex (e.g., people are more willing to have sex with someone they otherwise might not have desired when sober, people are also less likely to use contraception when intoxicated). 
 
+In the gay male population, the intersections between harder "party drugs" and sex have become especially popular. This group has invented the term "chemsex", which involves using drugs to enhance the experience of having sex. Usually, people do have chemsex to change the physical sensations they experience during sex. Even sex shops that target LGBTQ+ populations have begun selling legal synthetic drugs meant for customers seeking out some version of chemsex. For example, there is a marked rise in the popularity and availability of a range of chemical psychoactive drugs called alkyl nitrites which are referred to as "poppers" by most users. Unfortunately, much like other patterns of sex and drug use, chemsex is hypothesized to increase the risk of transmitting STIs.
 
-```{r}
+In this short report, I wanted to explore the early-life intersections of sex and drug use. I used a sub-set of the Add Health data set to examine patterns of drug use at the time of respondents' first sexual encounters. This is obviously a very limited scope and only considers the following variables:
+
+* `bio_sex`: the reported biological sex of a resondent
+* `drink`: a mutated variable that records whether a respondent was drinking at the time of their first sexual encounter
+* `drugs`: a mutated variable that records what drugs (besides alcohol) a respondent was using during their first sexual incounter (if any)
+
+```{r, include=FALSE, message=FALSE, warning=FALSE, echo=FALSE}
 #labeling function
 labelled <- function(x, label) {
     Hmisc::label(x) <- label
@@ -92,10 +101,7 @@ dat4_renamed <- dat4_renamed %>%
         "(3) Refused or other sex"
     )))
 
-```
 
-
-```{r}
 #re-labeling the dataset
 attributes(dat4_renamed)$label <- "Sub-set of National Longitudinal Study of Adolescent to Adult Health on drug use during first intercourse"
 
@@ -110,6 +116,9 @@ attributes(dat4_renamed$drinking_at_first_intercourse)$label <- "Was the respond
 attributes(dat4_renamed$drugs_at_first_intercourse)$label <- "What drugs did the respondent take at the time of first intercourse (not including alcohol)?"
 ```
 
+#Sample's Sex Distribution
+
+Here you can see a basic count of the sub-sample's sex distribution. It is fairly evenly distributed.
 ```{r}
 #count of sex dist in sample
 dat4_renamed %>% 
@@ -122,8 +131,9 @@ dat4_renamed %>%
     kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), position = "float_right")
 ```
 
+#Use of substances at first intercourse
 
-
+While much of the literature makes alcohol seem like a leading moderator of sexual risk-taking, most people in my sample were not drinking at the time of their first intercourse.
 
 ```{r}
 #count of alcohol at 1st intercourse in sample
@@ -137,8 +147,10 @@ dat4_renamed %>%
     kable_classic(full_width = F, html_font = "Cambria") %>% 
     kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), position = "float_right")
 ```
+
+Similarly, the large majority of my sample report taking no drugs at the time of their first intercourse.
 ```{r}
-#count of alcohol at 1st intercourse in sample
+#count of drugs at 1st intercourse in sample
 
 dat4_renamed %>% 
     group_by(drugs_at_first_intercourse) %>% 
@@ -150,7 +162,9 @@ dat4_renamed %>%
     kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), position = "float_right")
 ```
 
+#Alcohol use and drug use at first intercourse 
 
+Does drinking at first intercourse increase the likelihood of also doing other substances? Based on the table below, it doesn't seem like that pattern is an obvious one.
 ```{r}
 #drug use by sex and whether ps used alcohol
 label(dat4_renamed$biological_sex)       <- "Sex"
@@ -159,7 +173,9 @@ label(dat4_renamed$drinking_at_first_intercourse)       <- "Alcohol use"
 table1( ~ biological_sex + drinking_at_first_intercourse | drugs_at_first_intercourse , data=dat4_renamed, overall="Total")
 
 ```
+#Plotting drug-use behaviors
 
+To visually illustrate the trends in sex, alcohol, and drug-use at time of first intercourse (or lack thereof), below are some graphical representations of the data.
 
 ```{r}
 drug_use_sex <- dat4_renamed %>% 
@@ -211,5 +227,6 @@ ggplot(data = drink_drug, mapping = aes(x = drugs_at_first_intercourse, y = `%`,
   facet_wrap(~drinking_at_first_intercourse)
 ```
 
-
+#Conclusion
+Over all, this VERY cursory glace at the drug-use behaviors of teens during their first sexual encounter find no strong patter to support a narrative that drug-use is highly correlated with having sex for the first time and there are no mentionable gender differences.
 
