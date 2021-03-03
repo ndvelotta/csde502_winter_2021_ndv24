@@ -1,0 +1,312 @@
+---
+title: "CSDE 502 Winter 2021, Assignment 8"
+author: Nicholas Velotta | ndv24@uw.edu
+output: 
+    bookdown::html_document2:
+        number_sections: true
+        self_contained: true
+        code_folding: hide
+        toc: true
+        toc_float:
+            collapsed: true
+            smooth_scroll: false
+    pdf_document:
+        number_sections: true
+        toc: true
+        fig_cap: yes
+        keep_tex: yes
+urlcolor: blue 
+---
+
+```{r}
+library(tidyr)
+library(tidyverse)
+library(knitr)
+library(captioner)
+library(kableExtra)
+
+figure_nums <- captioner(prefix = "Figure")
+table_nums <- captioner(prefix = "Table")
+```
+
+___Explanation___:
+This assignment is intended to give you more practice in manipulating variables. 
+
+___Instructions___: 
+
+1. Make sure your Rmd file has no local file system dependencies (i.e., anyone should be able to recreate the output HTML using only the Rmd source file).
+1. Make a copy of this Rmd file and add answers below each question. The code that generated the answers should be included, as well as the complete source code for the document.
+1. Change the YAML header above to identify yourself and include contact information.
+1. For any tables or figures, include captions and cross-references and any other document automation methods as necessary.
+1. Make sure your output HTML file looks appealing to the reader.
+1. Upload the final Rmd to your github repository.
+1. Download [`assn_08_id.txt`](http://staff.washington.edu/phurvitz/csde502_winter_2021/assignments/assn_08_id.txt) and include the URL to your Rmd file on github.com.
+1. Create a zip file from your copy of `assn_08_id.txt` and upload the zip file to the Canvas site for Assignment 8. ___The zip file should contain only the text file. Do not include any additional files in the zip file--everything should be able to run from the file you uploaded to github.com. Use zip format and not 7z or any other compression/archive format.___
+
+# Race Qs
+Imagine a new variable: multirace, using the following value definitions:
+
+	1 = one race, White
+	2 = one race, not White
+	3 = two races, includes White
+	4 = two races, both non-White
+	5 = three or more races, includes White
+	6 = three or more races, all non-White
+	9 = any race missing (White, Black/African American, American Indian, Asian, other)
+
+
+## Hypothetical df
+__Fill in the codes for the hypothetical cases below (`r table_nums(name = "t01", display = "cite")`).__
+
+`r table_nums(name = "t01", caption = "A hypothetical data set")`
+
+| white| black| AI| asian| raceother|multirace |
+|-----:|-----:|--:|-----:|---------:|---------:|
+|     1|     0|  0|     0|         0|         1|
+|     0|     1|  0|     0|         0|         2|
+|     1|     0|  0|     1|         0|         3|
+|     0|     1|  1|     0|         0|         4|
+|     1|     1|  0|     1|         0|         5|
+|     0|     1|  0|     0|         1|         4|
+|     0|     1|  1|     0|         1|         6|
+|     1|     0|  1|     0|         0|         3|
+|     1|     1|  1|     0|         1|         5|
+|     6|     1|  8|     1|         6|         9|	
+
+
+## Using inline expressions
+__Using this data frame (code below), report how many cases checked more than one race.__ Use R code to make this calculation and use inline expressions.
+
+```{r}
+dat_hm <- 
+structure(
+    list(
+        white = c(1L, 0L, 1L, 0L, 1L, 0L, 0L, 1L, 1L, 6L),
+        black = c(0L, 1L, 0L, 1L, 1L, 1L, 1L, 0L, 1L, 1L), 
+        AI = c(0L, 0L, 0L, 1L, 0L, 0L, 1L, 1L, 1L, 8L), 
+        asian = c(0L, 0L, 1L, 0L, 1L, 0L, 0L, 0L, 0L, 1L), 
+        raceother = c(0L, 0L, 0L, 0L, 0L, 1L, 1L, 0L, 1L, 6L), 
+        multirace = c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA)
+    ), 
+    class = "data.frame", 
+    row.names = c(NA, -10L)
+)
+
+dat_hm_onerace <- dat_hm %>% 
+  mutate(multirace = case_when(
+    (white == 1)  &  (black == 1 | AI == 1| asian ==1 | raceother == 1) ~ 1,
+    (black == 1)  &  (white == 1 | AI == 1| asian ==1 | raceother == 1) ~ 1,
+    (AI == 1)  &  (black == 1 | white == 1| asian ==1 | raceother == 1) ~ 1,
+    (asian == 1)  &  (black == 1 | AI == 1| white ==1 | raceother == 1) ~ 1,
+    (raceother == 1)  &  (black == 1 | AI == 1| asian ==1 | white == 1) ~ 1, 
+    TRUE ~ 0
+  ))
+
+multiracial <- sum(dat_hm_onerace$multirace)
+
+```
+> In this data set, there are `r (multiracial)` respondents who marked more than one race identifier.
+
+
+## Creating multiracial variable
+__Write R code to create the multirace variable, using the data set [AHwave1_v3.rds](http://staff.washington.edu/phurvitz/csde502_winter_2021/data/AHwave1_v3.rds).__ _Hint: You may want to create another variable, numrace, that counts the number of races._ Use [`download_file()`](https://stat.ethz.ch/R-manual/R-devel/library/utils/html/download.file.html) and `Sys.getenv("TEMP")` to download the file to your system's `TEMP` directory to avoid local file system dependencies.
+
+```{r}
+dat <- haven::read_dta("http://staff.washington.edu/phurvitz/csde502_winter_2021/data/AHwave1_v1.dta")
+tmpdir <- Sys.getenv("TEMP")
+saveRDS(object = dat, file = file.path(tmpdir, "AHwave1_v1.dta"))
+
+#Using `downloadfile`:
+#tmpdir <- Sys.getenv("TEMP")
+#download.file("http://staff.washington.edu/phurvitz/csde502_winter_2021/data/AHwave1_v1.dta",tmpdir) #note that I do not have permission to download to temp folder using my CSDE account, but hopefully this works for you!
+#dat <- read.table(temp, "AHwave1_v1.dta")
+
+labelled <- function(x, label) {
+    Hmisc::label(x) <- label
+    x
+}
+```
+
+Below you can see my brute force method of coding the `multiracial` variable--I really look forward to seeing your undoubtedly more parsimonious chunk...I also think mine is incorrectly sorting people with 3+ races (which will be obvious when looking at my table). *I spent a lot of time trying to figure out a different route but nothing was working for me, and so I produced the less appealing chunk below!*
+
+```{r}
+racedat <- dat %>% 
+  select(h1gi4, #hispanic
+         h1gi6a, #white
+         h1gi6b, #Black
+         h1gi6c, #AI
+         h1gi6d, #asian
+         h1gi6e) %>% #other
+  filter(h1gi4 != 7|8, #hispanic drops
+         h1gi6a != 7|8, #white drops
+         h1gi6b != 7|8,#Black drops
+         h1gi6c != 7|8, #AI drops
+         h1gi6d != 7|8, #asian drops
+         h1gi6e != 7|8) %>%  #other drops
+  mutate(race = case_when(
+    h1gi4 == 1 ~ 1,#"hispanic",
+    h1gi6a == 1 ~ 2,#"white",
+    h1gi6b == 1 ~ 3,#"Black",
+    h1gi6c == 1 ~ 4,#"AI",
+    h1gi6d == 1 ~ 5,#"asian",
+    h1gi6e == 1 ~ 6,#"other"
+  )) %>% 
+    mutate(multiracial = case_when(
+      #race == 2 & (1|3|4|5|6) ~ 1, #mutli-white
+      #race == 1 & (2|3|4|5|6) ~ 1,
+      #race == 3 & (1|2|4|5|6) ~ 1,
+      #race == 4 & (1|3|2|5|6) ~ 1,
+      #race == 5 & (1|3|4|2|6) ~ 1,
+      #race == 6 & (1|3|4|5|2) ~ 1,
+      race == 2 & race != (1|3|4|5|6) ~ 1, #one race white
+      race == (1|3|4|5|6) & race != 2 ~ 2, #one race non-white
+      race == 2 & race == 1 & race != 3:6 ~3, #2 races white
+      race == 2 & race == 3 & race != 1|4:6 ~3, #ii
+      race == 2 & race == 4 & race != 1|3|5|6 ~3, #ii
+      race == 2 & race == 5 & race != 1|3|4|6 ~3, #ii
+      race == 2 & race == 6 & race != 1|3:5 ~3, #ii
+      race == 1 & race == (3|4|5|6) & race != 2 ~4, #2 races non-white
+      race == 2 & race == 1 & race == (3:6) ~5, #3 races white
+      race == 2 & race == 3 & race == (1|4:6) ~5, #3 races white
+      race == 2 & race == 4 & race == (1|3|5|6) ~5, #3 races white
+      race == 2 & race == 5 & race == (1|3|4|6) ~5, #3 races white
+      race == 2 & race == 6 & race == (1|3|5|4) ~5, #3 races white
+      race == (1) & race == (3|4) & race == (5|6) & race != 2 ~6, #3 races non-white
+      race == (3) & race == (1|4) & race == (5|6) & race != 2 ~6, #3 races non-white
+      race == (4) & race == (1|3) & race == (5|6) & race != 2 ~6, #3 races non-white
+      race == (5) & race == (1|4) & race == (3|6) & race != 2 ~6, #3 races non-white
+      race == (6) & race == (1|4) & race == (5|3) & race != 2 ~6, #3 races non-white
+      TRUE ~ 9
+    ))
+
+```
+
+
+## Label and attributes
+__Label the multirace variable as well as its values using attribute labels.__.
+
+```{r}
+#renaming labels
+racedat_renamed<- racedat %>% select(multiracial)
+colnames(racedat_renamed)<-c("Multiracial Identity")
+racedat_renamed <- racedat_renamed %>% 
+    mutate(`Multiracial Identity` = factor(`Multiracial Identity`, levels = c(1,2,3,4,5,6,9), labels = c(
+        "(1) one race, White",
+        "(2) one race, not White",
+        "(3) two races, includes White",
+        "(4) two races, both not White",
+        "(5) three or more races, includes White",
+        "(6) three or more races, all non-White",
+        "(9) missing race"
+    )))
+
+
+#re-labeling the dataset
+attributes(racedat_renamed)$label <- "Sub-set of National Longitudinal Study of Adolescent to Adult Health: Multiracial Identity"
+
+
+attributes(racedat_renamed$`Multiracial Identity`)$label <- "Number of races selected"
+
+```
+
+## Contingency Table
+__Include below a contingency table of the multirace variable. Make sure that the values are labelled so the table is readable, and also include any missing values.__
+
+```{r}
+racedat_renamed %>% 
+    group_by(`Multiracial Identity`) %>% 
+    summarise(n = n(),
+              .groups = "drop_last") %>% 
+    mutate(`%` = n / sum(n) * 100) %>% 
+    mutate(`%` = `%` %>% round(3)) %>% 
+    kable(caption = "Number of races selected by respondent") %>% 
+    kable_classic(full_width = F, html_font = "Cambria") %>% 
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+```
+
+# Knowledge Quiz Qs
+__Review part B of each of the answers (i.e., `H1KQ1B .. H1KQ10B`) to the Knowledge Quiz (Section 19 of the Add Health questionnaire, documented in `INH19PUB.PDF`). The 10 questions each ask: â€œHow confident are you that your answer is correct?â€__
+
+## 
+__Write R code that creates a single summary variable named `kqconfidence`, with a larger number representing the respondent being more confident across all questions (scale of 0 to 3 for each individual question; `kqconfidence` will be the sum for each subject across the 10 questions). Note that any observations with value 7 (i.e., age less than 15) should be removed from the data frame, and values 6, 8, and 9 should be coded as `NA` (i.e., missing) for the purposes of scoring confidence. Document your code so that the reader knows how you scored the scale and how you handled missing values. Make sure to label the new variable.__
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+
+library(tidyverse)
+library(magrittr)
+library(knitr)
+library(kableExtra)
+library(haven)
+library(pdftools)
+library(curl)
+library(ggplot2)
+
+#dat <- haven::read_dta("http://staff.washington.edu/phurvitz/csde502_winter_2021/data/AHwave1_v1.dta")
+```
+
+
+### Selecting specific columns
+There are several ways of selecting the desired columns into a new data frame. Here is brute force approach:
+
+```{r}
+condat <- dat %>% 
+    filter("h1kq.*b" != 7) %>% 
+    select(
+        aid,
+        matches("h1kq.*b")
+    )
+```
+
+### reordering vars to be on 0-3 scale with 6/8/9 coded as NA
+
+```{r}
+
+condat <- condat %>% 
+  dplyr::filter("h1kq.*b" != 7) %>% # ATTN: this isn't filtering out 7's...
+  mutate_at(.vars = vars(matches("h1kq.*b")),
+              funs(
+                  case_when(
+                      . == 4 ~ 0, #not conf at all
+                      . == 3 ~ 1,
+                      . == 2 ~ 2,
+                      . == 1 ~ 3, #very conf
+                     TRUE ~ NA_real_  #missing/NA
+                      
+     )))
+
+```
+### creating `kqconfidence` variable
+
+```{r}
+condat_1 <- condat %>% select(-1) %>% mutate(kqconfidence = rowSums(.)) %>% 
+    # bring the ID back in
+    mutate(aid = dat$aid) %>% 
+    # reorder columns
+    select(aid, kqconfidence)
+                     
+```
+
+## Contingency table
+__Create and include below a contingency table from `kqconfidence` with raw counts, percentages, and cumulative percentages.__
+
+```{r}
+    
+condat_1 %>% group_by(kqconfidence) %>% 
+     dplyr::summarise(n = n(),
+                      .groups = "drop_last") %>% 
+   mutate(`%` = n / sum(n) * 100) %>% 
+    mutate(`%` = `%` %>% round(3))
+```
+
+
+
+## Average Sum
+__For each possible value of the Knowledge Quiz Part A sum score (from Section \@ref(scoring-across-columns)) what is the mean `kqconfidence` level? __
+
+
+
+> I could not get colsums to work for this problem--but I assumed I would write a chunk that took the colSums of all `"h1kq.*b"` and then write a variable that divided the colsums by the # of rows to get each item's average sum.
+
+
+# Source code
+[ndv24_HW_08.Rmd](ndv24_HW_08.Rmd)
