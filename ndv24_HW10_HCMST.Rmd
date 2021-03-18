@@ -1,0 +1,438 @@
+---
+title: "Going online to go the distance?: Estimating relationship durations among online and offline daters"
+author: "Nicholas Velotta | ndv24@uw.edu"
+date: "Winter 2021"
+header-includes: #allows you to add in your own Latex packages
+- \usepackage{float} #use the 'float' package
+- \floatplacement{figure}{H} #make every figure with caption = h
+output: 
+    pdf_document:
+        number_sections: true
+        toc: true
+        fig_cap: yes
+        keep_tex: yes
+    bookdown::html_document2:
+        number_sections: true
+        self_contained: true
+        code_folding: hide
+        toc: true
+        toc_float:
+            collapsed: true
+            smooth_scroll: false
+bibliography: ndv24_hw10_hcmst_bib.bib
+csl: apa_single_spaced.csl
+link-citations: true
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(tidyr)
+require(tidyverse)
+require(ggplot2)
+require(dplyr)
+require(DT)
+require(haven)
+require(readstata13)
+require(knitr)
+require(kableExtra)
+require(survival)
+require(maxLik)
+require(evd)
+require(eha)
+require(gtsummary)
+require(labelled)
+require(purrr)
+require(bookdown)
+
+
+w1_hcmst  <- haven::read_dta("HCMST_ver_3.04.dta")
+w4_hcmst <- haven::read_dta("wave_4_supplement_v1_2.dta")
+w5_hcmst <- haven::read_dta("HCMST_wave_5_supplement_ver_1.dta")
+w6_hcmst <- haven::read_dta("HCMST_wave_6_public_v1.dta")
+
+w123_filtered <- w1_hcmst  %>% 
+  select(caseid_new, ppgender, either_internet_adjusted, w2_q5, w3_q5, w2_days_elapsed, w3_days_elapsed, w3_xqualified, how_long_relationship) %>% 
+  filter(!is.na(either_internet_adjusted)) %>% #filtering out NAs on "online or offline meeting var"
+  mutate(met_online = 
+           case_when(
+             either_internet_adjusted == 1 ~ 1, #"(1) met online"
+             TRUE ~ 0)) %>%  #"(0) met offline"
+    mutate(met_online= factor(met_online, labels = c( #online as factor var
+        "(0) met offline", 
+        "(1) met online"))) %>% 
+  mutate(biosex = 
+           case_when(
+             ppgender == 1 ~ 1, #male
+             ppgender == 2 ~ 0, #female
+           )) %>% 
+  mutate(rel_dur_prior = 
+           how_long_relationship * 365.25) 
+
+
+
+
+
+w4_filtered <- w4_hcmst %>% 
+  select(caseid_new, w4_q5, w4_xqualified)
+
+w5_filtered <- w5_hcmst %>% 
+  select(caseid_new, w5_q5, w5x_qualified)
+
+w6_filtered <- w6_hcmst %>% 
+  select(caseid_new, w6_still_rel)
+
+#binding cols
+all_filtered_hcmst <- w123_filtered %>% left_join(w4_filtered, by = c("caseid_new"="caseid_new")) %>% 
+  left_join(w5_filtered, by = c("caseid_new"="caseid_new")) %>% 
+  left_join(w6_filtered, by = c("caseid_new"="caseid_new"))
+
+hcmst_filtered <- all_filtered_hcmst %>% 
+  select(caseid_new, met_online, biosex, rel_dur_prior, w2_q5, w2_days_elapsed, w3_xqualified, w3_q5, w3_days_elapsed, w4_xqualified, w4_q5, w5x_qualified, w5_q5, w6_still_rel) %>% 
+   filter(!is.na(w2_q5)) 
+
+hcmst_filtered$rel_dur_prior = round(hcmst_filtered$rel_dur_prior, 0)
+  
+
+var_label(hcmst_filtered$biosex) <- "biological sex reported"
+var_label(hcmst_filtered$met_online) <- "did indv. meet partner online?"
+
+
+
+```
+
+# Introduction:
+
+During what was meant to be the company’s first major television interview, Match.com founder, Gary Kremen declared his site would “bring more love to the planet than anything since Jesus Christ” [@slater_we_2014].  This would be a gutsy claim for a CEO to make in 2021; it was almost delusive for Kremen to propose such success in 1995 when approximately five percent of the U.S. population had internet access [@kauflin_how_2011]. It’s worth mentioning that Kremen was wearing a tie-dye shirt and insisted on taking the interview seated in a beanbag chair at the time. Today, Match Group includes its namesake site along with apps and sites like Tinder, PlentyOfFish, OkCupid, Hinge, and Pairs, it is valued at over $45 billion dollars, and commands a dating pool with hundreds of millions of users [@gurdus_bumble_2021]. Upon second look, Kremen’s prophecy may actually seem *prescient*.
+
+## Online dating: changing intimacy one swipe at a time?
+Few aspects of romantic relationships have shifted as radically in the past fifty years than how we find our mates. Less than a century ago people around the world primarily found their partners through *familial networks*—for example, through formal and informal forms of matchmaking and/or arranged-marriages. The only other significant mediators of relationship formation were *proximity and interaction* (i.e., people tended to marry the available mates around them geographically and those they saw most frequently) [@coontz_marriage_2006]. The number of couples who meet through community-sourced matchmaking is now a vanishing minority. Instead, a majority share of American couples now find their partners online or on dating apps [@rosenfeld_disintermediating_2019]. In a previous article [@schwartz_online_2018], I reviewed the literature on online dating’s rise in popularity here and around the globe, however, while writing that article the lack of available information on people’s behaviors and experiences using online dating was striking. The dearth of empirical knowledge on how online daters find (or, perhaps, *do not* find) partners can be attributed to the privatization of all major matchmaking websites; the data that users generate is the property of the online dating companies. Such is the situation that the mechanisms which lead to forty percent (or more) of all new relationships, marriages, and sexual encounters are unknown to the scientific community [@rosenfeld_disintermediating_2019]. In effect, relationship scientists are operating with little more than anecdotes and self-reports of online dating behavior from a handful of surveys and interview-based studies. And the closest academics get to analyses of user data appear in the form of company press-releases on the efficacy of matching algorithms. Of course, these press-releases are suspected of bias, conceal the raw data, and lack explanations of statistical methods. Until online dating companies are forthcoming with their data and practices, researchers need to develop innovative techniques to study online dating behavior.
+
+## Current project
+While this exploratory project will not establish those techniques, it builds towards my ability to do so given the time limitations of the course. By using the most credible source of longitudinal data on relationships formed online, the How Couples Meet and Stay Together survey (HCMST), I will evaluate the dissolution rates of relationships that have been formed online versus offline. Modeling a form of relationship stability (i.e. staying together) using the nationally representative sample provided by the most notable researcher of modern dating patterns, I aim to: (1) become familiar with the six waves of data generated by the HCMST, (2) apply relevant statistical methods to understanding relationship life cycles (i.e., a form of event history analysis), and (3) understand the relative frequency of online daters’ reentry into the single dating pool compared to offline daters. Considering that the widespread use of dating services took place alongside a (relatively) recent plateau in the national divorce rate [@cohen_coming_2019], I expect:
+
+### Hypotheses
+
+> $H_{1}:$ *The likelihood of separating will not differ between individuals who met their partner online versus those that met their partners offline.*
+
+Because it has long been observed that American men tend to have more relationships across their life spans compared to American women [@schwartz_gender_2018], and because men to also have more concurrent relationships (i.e., parallel relationships with multiple people at a time) [@paik_contexts_2010], I also anticipate: 
+
+> $H_{2}:$ *Males will have higher likelihoods of dissolution than women, regardless of how the relationship was initiated.*
+
+
+# Methods
+
+## Data set and sample characteristics
+
+I will use the first six waves (2009-2017) of the [HCMST](https://data.stanford.edu/hcmst) to predict the likelihood of dissolution across relationships formed online versus those formed offline. To indicate how a respondent met their partner, I will use a recalibrated `either_internet_adjusted` variable which Rosenfeld et al. [-@rosenfeld_how_2018] coded as either “met online,” “not met online,” and “probably not met online” based on respondents answers to two items asking first whether they met their current romantic partner online, and second prompting respondents to provide a text entry describing how they met their partner. The researchers compared the two types of responses for each individual and sorted the participants who answered incongruously on the items into the most appropriate category for analysis (i.e., met online, met offline, or probably did not meet online). For my analysis I created the binary factor variable `met_online` which  collapses the response values into: 1 = “met online” and 0 = “met offline.” Below in Table \@ref(tab:metonlinesampletable) you can see my sample’s distribution on `met_online`.
+
+```{r metonlinesampletable}
+#check counts for online vs offline
+all_filtered_hcmst %>% group_by(met_online) %>% 
+    summarise(n = n()) %>% 
+    mutate(`%` = n / sum(n) * 100) %>% 
+    mutate(`%` = `%` %>% round(3)) %>% 
+    kable(caption = "Counts for online versus offline relationship initiation") %>% 
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+```
+
+My project will also consider the biological sex as a covariate for predicting relationship dissolution. The variable provided by HCMST `ppgender` has been transformed into the binary variable `biosex` (1 = male; 0 = female) with a distribution shown in Table \@ref(tab:biosexsampletable). 
+
+```{r biosexsampletable}
+#check counts for gender dist
+all_filtered_hcmst %>% group_by(biosex) %>% 
+    summarise(n = n()) %>% 
+    mutate(`%` = n / sum(n) * 100) %>% 
+    mutate(`%` = `%` %>% round(3)) %>% 
+    kable(caption = "Counts for biological sex distribution of sample (male = 1 , female = 0)") %>% 
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+```
+
+## Data wrangling
+
+This analysis uses a parameter covariate (PC) regression, an expanded-on and generalized variation of a generalized linear model (GLM), which enables me to fit my longitudinal data set to new distributions outside of those distributions typically available to GLMs (which can be limiting). In particular, I fit my data to a PC model using the Weibull distribution so that the parameters of my model change in response to fluctuations in the model’s covariates (`met_online` and `biosex`). 
+
+Working with the HCMST data set presented a few challenges worth mentioning. First, and most importantly, the researchers were not always consistent with how they recorded different variables or even *if* they recorded them. For example, the data set included day counts “since respondent’s completion of wave 1” for wave 2 and wave 3 but did not include any day counts for subsequent waves (4-6). To account for the missing duration data—which was essential for conducting any kind of event history analysis—I found the data collection windows for each wave, averaged out the dates to a midpoint between the beginning of a wave’s data collection process and the conclusion of a wave’s data collection process, and I used this midpoint date as the my indicator of when a given wave was administered for all participants (see Equation \@ref(eq:wavemidpoint)). After calculating all midpoints for waves 1-6, I calculated the number of days elapsed since wave 1 (see Equation \@ref(eq:wavedayselapsed)). This process allowed me to estimate how long people remained in the study based on these wave data collection times. I then calculated relationship durations using the `rel_dur_prior ` variable, which was created from the raw `how_long_relationship` variable that asked how long participants had been with their partner at the time of taking wave 1. HCMST recorded prior relationship durations in years, I converted this to duration in days (rounded to the nearest full day). All those that had a missing value for `rel_dur_prior` were dropped from my sample ( *n* = 5) because they could neither be right censored nor interval censored—this did not affect the significance or directions of any of my results in any meaningful way.
+
+\begin{equation}
+  \mbox{Midpoint of wave (x)} = \frac {\mbox{(Start date of data collection for wave (x)) + (End date of data collection for Wave (x))}}{2}
+  (\#eq:wavemidpoint)
+\end{equation}
+
+\begin{equation}
+  \mbox{Wave (x)'s time elapsed since wave 1} = \mbox{(Wave 1 data collection date) + ((Midpoint of wave (x)) - (Wave 1 data collection date))}
+  (\#eq:wavedayselapsed)
+\end{equation}
+
+I then created vectors containing each participants’ respective $t_o$ (when they entered their current relationship) and $t_c$ (what wave they left the study due to a break-up). Those without a $t_c$ are participants that were still in a relationship with their partner at the time of the last wave (wave 6), and so they have been right censored. I used a loop (below) to create the “time open” and “time close” vectors.
+
+```{r}
+t_o = t_c = last_ind = rep(NA, nrow(hcmst_filtered))
+
+
+for(i in 1:nrow(hcmst_filtered)) { #instructs index i to update until reachs n of rows in dataset
+  rel_status_temp = c(hcmst_filtered[i, 5], hcmst_filtered[i, 8], hcmst_filtered[i, 11], hcmst_filtered[i, 13],
+    hcmst_filtered[i, 14]) #pulling values from each col (i)
+ last_index = last(which(rel_status_temp == 1))  #every vector we create will be 5 elements long, this will find which out of 5 we have a value of 1
+ last_index = ifelse(is.na(last_index), 0, last_index) #rather than testing for NA status, rec NAs as a 0
+ last_ind [i] = last_index
+ if(last_index == 0) {
+   t_o [i] =  hcmst_filtered[i, 4] #the number of days p was in relationship before wave 1 = to if they haven't broken up
+   t_c [i] = hcmst_filtered[i, 4] + hcmst_filtered[i, 6] #will give us interval censoring betwn w1-w2
+ }
+ if(last_index == 1) {
+   t_o [i] = hcmst_filtered[i, 4] + hcmst_filtered[i, 6]
+   t_c [i] = hcmst_filtered[i, 4] + hcmst_filtered[i, 9] #counting the time before w1 and w2 accounts for diff in time recorded in `time elapsted var`
+ }
+ if(last_index == 2) {
+   t_o [i] = hcmst_filtered[i, 4] + 819 #days btw w3 and w1
+   t_c [i] = hcmst_filtered[i, 4] + 1678
+ }
+ if(last_index == 3) {
+   t_o [i] = hcmst_filtered[i, 4] + 1678
+   t_c [i] = hcmst_filtered[i, 4] + 2134
+ }
+ if(last_index == 4) {
+   t_o [i] = hcmst_filtered[i, 4] + 2134
+   t_c [i] = hcmst_filtered[i, 4] + 3068
+ }
+ if(last_index ==5) {
+   t_o[i] = hcmst_filtered[i, 4] + 3068
+   t_c [i] = Inf
+ }
+   
+} 
+
+t_o = as_vector(t_o) 
+t_c = as_vector(t_c) 
+```
+
+## Data analysis
+
+The HCMST has no exact observations besides `rel_dur_prior` measuring the number of days a couple had been together before entry into the study. To account for this, I conducted interval censoring and a left truncation of the data.  This can be accomplished by taking the difference of the $t_o$ and $t_c$ survival functions and dividing by the survival function at  `rel_dur_prior` (see Equation \@ref(eq:charlife). I also created the exponentiated linear predictor, which in the case of Weibull distributions is also the *characteristic life* (i.e., the time at which 63.2% of units will experience my event of interest) and multiplied it across all individuals in my sample. This essentially creates a baseline parameter estimate measuring *each individual’s* characteristic life. 
+
+\begin{equation}
+  \mbox{Characteristic life} = \frac{S_{t_{o}} - S_{t_{c}}}{S_{\mbox{dur_rel_prior}}} 
+  (\#eq:charlife)
+\end{equation}
+
+
+### Parameters
+
+Given the properties of the Weibull distribution’s shape parameter $c$, whereby $c = 1$ implies 0 variation in shape parameters as covariates change—i.e., a negative exponential distribution. This makes setting  $c = 1$ an ideal first model to test regarding the shape parameter. My results will let me know where the data is pulling my shape parameter towards (whether it is below or above a value of 1). I anticipate a value lower than 1 for $c$ which would infer that a longer duration for a given relationship would correlate with a lower risk of breaking up at a given time point. Or, more plainly: the longer a couple has been together, the more likely they are to *stay* together.
+
+Because my two covariates (`met_online`) and (`biosex`) are both binary factor variables, I will need to model various combinations of these covariates to assess the model’s coefficient predictions for different groups of people. For example, setting `met_online` and `biosex` both to 0 produces a model looking at females who met their partners offline; whereas setting `met_online` and `biosex` both to 1 produces a model looking at males who met their partners online.
+
+```{r}
+temp_dat = data.frame(t_o, t_c, rel_dur_prior = hcmst_filtered$rel_dur_prior, 
+                      met_online = hcmst_filtered$met_online, biosex = hcmst_filtered$biosex) %>%  na.omit()
+temp_dat$met_online = as.numeric(temp_dat$met_online)-1
+
+#################
+#for Weibull PC1:
+ y = temp_dat[,1:3]
+ pars = c(b = median(temp_dat[,1]), c = 1, met_online=0, biosex=0) #testing neg exp w/ c =1
+ X = as.matrix(temp_dat[,4:5])
+ 
+logProb.WeibullPC = function(pars, y, X){
+  b = pars[1]
+  c = pars[2] #Weibull shape parameter
+  gammas = pars[3:4]; names(gammas) = c("met_online", "biosex") #gammas will have regression coeffs labels
+  b_i = b*exp(colSums(gammas*t(X))) #b para for each individual (bc this responds to covariates)--recall: characteristic life = the exponentiated linear predictor
+  
+  return(
+     log(
+        (pweibull(q = y$t_o, scale = b_i, shape = c, lower.tail = F, log.p = F) - # taking the diff of s(t)s BEFORE they are logged
+          pweibull(q = y$t_c, scale = b_i, shape = c, lower.tail = F, log.p = F)) 
+          / #divide by s(t) at `rel_dur_prior`
+          pweibull(q = y$rel_dur_prior, scale = b_i, shape = c, lower.tail = F, log.p = F))
+     ) #doing left truncation
+}
+
+WeibullPC = maxLik(
+  logLik = logProb.WeibullPC, 
+ y = y,
+ start = pars, #testing neg exp w/ c =1
+ X = X,
+ method = "BHHH")
+```
+
+# Results
+
+## Weibull PC Model 1 ($c = 1$, Negative Exponential)
+
+
+```{r}
+#RESULTS for PC 1
+
+summary(WeibullPC) # has c = 1, mo = 0, bs = 0
+```
+
+Setting  my shape parameter to fit a negative exponential distribution, I immediately notice my $c$ parameter at `r coef(summary(WeibullPC))[2,1]`, which is more along the lines of what I anticipated (recall, I expected a $c$ of about 0.5). Nonetheless, I still can see that model predicts a characteristic life for relationship duration of `r coef(summary(WeibullPC))[1,1]` days for females who met their partners **offline** (Std. error: `r coef(summary(WeibullPC))[1,2]`, $p>.000$). And, as $H_1$ predicted, whether a female met her partner online or offline (`met_online`) is not a significant predictor of her relationship duration ($p>.05$). 
+
+$H_2$ (males will have significantly shorter relationship durations than females) is unsupported by **all** models I ran.
+
+## Weibull PC Model 2 ($c = 0.5$)
+
+```{r, warning=FALSE, message=FALSE}
+#################
+#for Weibull PC2:
+ y = temp_dat[,1:3]
+ pars = c(b = median(temp_dat[,1]), c = .5, met_online=1, biosex=0) #testing neg exp w/ c =1
+ X = as.matrix(temp_dat[,4:5])
+ 
+logProb.WeibullPC = function(pars, y, X){
+  b = pars[1]
+  c = pars[2] #Weibull shape parameter
+  gammas = pars[3:4]; names(gammas) = c("met_online", "biosex") #gammas will have regression coeffs labels
+  b_i = b*exp(colSums(gammas*t(X))) #b para for each individual (bc this responds to covariates)--recall: characteristic life = the exponentiated linear predictor
+  
+  return(
+     log(
+        (pweibull(q = y$t_o, scale = b_i, shape = c, lower.tail = F, log.p = F) - # taking the diff of s(t)s BEFORE they are logged
+          pweibull(q = y$t_c, scale = b_i, shape = c, lower.tail = F, log.p = F)) 
+          / #divide by s(t) at `rel_dur_prior`
+          pweibull(q = y$rel_dur_prior, scale = b_i, shape = c, lower.tail = F, log.p = F))
+     ) #doing left truncation
+}
+
+WeibullPC2 = maxLik(
+  logLik = logProb.WeibullPC, 
+ y = y,
+ start = pars, #testing neg exp w/ c =1
+ X = X,
+ method = "BHHH")
+
+#RESULTS FOR PC 2
+summary(WeibullPC2) #has c = .5, mo = 1, bs = 0
+```
+
+Here, looking at females who met their partners **online**, the characteristic life of their partnerships is approximately `r coef(summary(WeibullPC2))[1,1]` days (Std error: `r coef(summary(WeibullPC2))[1,2]`, $p>.000$).
+
+## Weibull PC Model 3 ($c = 0.5$)
+
+```{r, warning=FALSE, message=FALSE}
+#For Weibull PC3:
+ y = temp_dat[,1:3]
+ pars = c(b = median(temp_dat[,1]), c = .5, met_online=0, biosex=1) #testing neg exp w/ c =1
+ X = as.matrix(temp_dat[,4:5])
+ 
+logProb.WeibullPC = function(pars, y, X){
+  b = pars[1]
+  c = pars[2] #Weibull shape parameter
+  gammas = pars[3:4]; names(gammas) = c("met_online", "biosex") #gammas will have regression coeffs labels
+  b_i = b*exp(colSums(gammas*t(X))) #b para for each individual (bc this responds to covariates)--recall: characteristic life = the exponentiated linear predictor
+  
+  return(
+     log(
+        (pweibull(q = y$t_o, scale = b_i, shape = c, lower.tail = F, log.p = F) - # taking the diff of s(t)s BEFORE they are logged
+          pweibull(q = y$t_c, scale = b_i, shape = c, lower.tail = F, log.p = F)) 
+          / #divide by s(t) at `rel_dur_prior`
+          pweibull(q = y$rel_dur_prior, scale = b_i, shape = c, lower.tail = F, log.p = F))
+     ) #doing left truncation
+}
+
+WeibullPC3 = maxLik(
+  logLik = logProb.WeibullPC, 
+ y = y,
+ start = pars, #testing neg exp w/ c =1
+ X = X,
+ method = "BHHH")
+
+#RESULTS FOR PC3
+summary(WeibullPC3) #has c = .5, met_online=0, biosex=1
+```
+Here, looking at males who met their partners **offline**, the characteristic life of their partnerships is approximately `r coef(summary(WeibullPC3))[1,1]` days (Std error: `r coef(summary(WeibullPC3))[1,2]`, $p>.000$).
+
+## Weibull PC Model 4 ($c = 0.5$)
+
+```{r, warning=FALSE, message=FALSE}
+#################
+#For Weibull PC4:
+ y = temp_dat[,1:3]
+ pars = c(b = median(temp_dat[,1]), c = .5, met_online=1, biosex=1) #testing neg exp w/ c =1
+ X = as.matrix(temp_dat[,4:5])
+ 
+logProb.WeibullPC = function(pars, y, X){
+  b = pars[1]
+  c = pars[2] #Weibull shape parameter
+  gammas = pars[3:4]; names(gammas) = c("met_online", "biosex") #gammas will have regression coeffs labels
+  b_i = b*exp(colSums(gammas*t(X))) #b para for each individual (bc this responds to covariates)--recall: characteristic life = the exponentiated linear predictor
+  
+  return(
+     log(
+        (pweibull(q = y$t_o, scale = b_i, shape = c, lower.tail = F, log.p = F) - # taking the diff of s(t)s BEFORE they are logged
+          pweibull(q = y$t_c, scale = b_i, shape = c, lower.tail = F, log.p = F)) 
+          / #divide by s(t) at `rel_dur_prior`
+          pweibull(q = y$rel_dur_prior, scale = b_i, shape = c, lower.tail = F, log.p = F))
+     ) #doing left truncation
+}
+
+WeibullPC4 = maxLik(
+  logLik = logProb.WeibullPC, 
+ y = y,
+ start = pars, #testing neg exp w/ c =1
+ X = X,
+ method = "BHHH")
+
+#RESULTS FOR PC4
+summary(WeibullPC4) #has c = .5, met_online=1, biosex=1
+```
+The relationships of males who met their partners **online** have a characteristic life of  `r coef(summary(WeibullPC4))[1,1]` days (Std error: `r coef(summary(WeibullPC4))[1,2]`, $p>.000$).
+
+## Relationship durations pre-W1
+
+```{r fig1}
+#boxplot(rel_dur_prior ~ met_online, temp_dat)
+#abline(h = 5113)
+
+boxplot_met <- ggplot(temp_dat, aes(x = as.factor(met_online), y = rel_dur_prior, color = as.factor(met_online))) +
+  geom_boxplot(outlier.colour="red", outlier.shape=8,
+                outlier.size=4, notch=TRUE)
+
+boxplot_met <- boxplot_met + geom_dotplot(binaxis='y', stackdir='center', dotsize=1, binwidth = 20)+
+  labs(title="Relationship durations before Wave 1",x="Met partner offline (0)  /  Met partner online = (1)", y = "Prior relationship duration (days)") + 
+  theme(legend.position="none") +
+  geom_hline(yintercept=5113, linetype="dashed", color = "red")
+
+boxplot_met
+```
+In Figure \@ref(fig:fig1) I have plotted the lengths of participants' relationships at time entry into HCMST. The dashed red line represents the year 1995, when the first major online dating company, Match.com, was founded. (Remember that guy bedecked in tie-dye? This is when he promised to be the next "Jesus Christ" of love.) We can assume most people who claim to have met their partner before 1995 were using online mediators unlike those used by modern day online daters, and so, in future research cohort effects should be explored for age/generation interacting with relationship duration and online/offline relationship initiation.
+
+
+```{r fig2}
+#boxplot(rel_dur_prior ~ met_online, temp_dat)
+#abline(h = 5113)
+
+boxplot_sex <- ggplot(temp_dat, aes(x = biosex, y = rel_dur_prior, group = biosex, color = as.factor(biosex))) + 
+  geom_boxplot(outlier.colour="red", outlier.shape=8,
+                outlier.size=4, notch=TRUE)
+
+boxplot_sex + geom_dotplot(binaxis='y', stackdir='center', dotsize=1, binwidth = 20)+
+  labs(title="Relationship durations before Wave 1",x="Female  (0)   /   Male  (1)", y = "Prior relationship duration (days)") +
+  theme(legend.position="none") +
+  geom_hline(yintercept= median(temp_dat$rel_dur_prior), linetype="dashed", color = "red")
+```
+And in Figure \@ref(fig:fig2), I have plotted the durations of participants' relationships at time of entry by biological sex. The dashed red line is the median relationship duration for all participants at wave 1. We can see most people came into the study with relationships around 5 years old. This is a fairly long duration to enter at, perhaps making my sample more stable (i.e., more weathered against breaking up) than other sample frames may allow. Also we can see that there isn't much difference between males' and females' prior relationship durations.
+
+# Discussion 
+
+While online dating services have certainly changed the way we find partners, perhaps less changed are those core elements that attract us to partners suitable for long-term, relatively stable relationships. Indeed, some of us are better than others at finding their *One*, their *soulmate*...others, may just be luckier. But one thing this report *cannot* support is a narrative in which meeting a partner online is the mediator between a relationship going the distance and a relationship sputtering out.
+
+This provides information for relationship researchers trying to understand how the biggest revolution in mate selection, the invention of online/app dating has (or even, has not) affected relationship patterns and life cycles for a majority share of Americans. 
+
+## Limitations
+
+There are many limitations to my analysis--I didn't even fit multiple types of event history models. But perhaps most egregious is the lack of grouping participants by sexual orientation. We know that queer couples are a growing share of American households and disproportionately rely on online/app services to find romantic partners [@schwartz_online_2018]. Unfortunately, the HCMST had inconsistent measurement for this variable and I was not confident in using the data for such an analysis--perhaps the new [HCMST2017](https://data.stanford.edu/hcmst2017) (the new iteration of HCMST using a new sample and an updated survey instrument) will have more reliable measurement. If so, it is worth  considering using that data in future projects that do not require longitudinal analysis, at least until a second wave of HCMST2017 has been completed. Another major limitation was the lack of age/generation cohorts (mentioned in the Results section).
+
+# References
+<div id="refs"></div>
+
+# Source code
+
+```{r, comment='', echo=FALSE}
+cat(readLines("ndv24_HW10_HCMST.Rmd"), sep = '\n')
+```
+
+
+
